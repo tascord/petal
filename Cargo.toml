@@ -2,6 +2,8 @@
 name = "petal"
 version = "0.0.1"
 edition = "2021"
+description = "A toy interpreted language"
+license = "MIT"
 
 [dependencies]
 clap = { version = "4.5.7", features = ["derive"] }
