@@ -1,0 +1,107 @@
+// monads
+negate = { "!" }
+negative = { "-" }
+
+// dyads
+pow = { "**" }
+equality = { "==" }
+add = { "+" }
+subtract = { "-" }
+multiply = { "*" }
+divide = { "/" }
+
+// delimiters
+lparen = _{ "(" }
+rparen = _{ ")" }
+lbrace = _{ "{" }
+rbrace = _{ "}" }
+ltri = _{ "<" }
+rtri = _{ ">" }
+comma = _{ "," }
+colon = { ":" }
+semicolon = _{ ";" }
+assignment = _{ "=" }
+
+// keywords
+declaration = { "let" }
+visibility = { "pub" | "local" }
+function = { "fn" }
+struct = { "struct" }
+trait = { "trait" }
+return = { "ret" }
+impl = { "impl" }
+for = { "for" }
+slf = { "self" }
+ret = _{ "return" }
+
+// literals
+boolean = { "true" | "false" }
+float = { ASCII_DIGIT* ~ "." ~ ASCII_DIGIT+ }
+int = { ASCII_DIGIT+ }
+
+// strings
+string = ${ "\"" ~ inner ~ "\"" }
+inner = _{ char* }
+char = _{
+    !("\"" | "\\") ~ ANY
+    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+// identifiers
+identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+
+/* ------------------------ */
+
+literal = _{ float | int | string | boolean }
+term = _{ literal | identifier | lparen ~ expr ~ rparen }
+terms = { term+ }
+
+// shorthand
+typed_var = { (identifier ~ typed) | slf }
+named_var = _{ identifier ~ colon ~ expr }
+typed_args = { typed_var ~ (comma ~ typed_var)* }
+args = _{ (expr | identifier) ~ (comma ~ (expr | identifier))* }
+typed = _{ (colon ~ (identifier)) | slf }
+
+// expressions
+monadic = { (negative | negate) ~ term }
+dyadic = { term ~ (pow | equality | add | subtract | multiply | divide) ~ term }
+expr = { fn_call | struct_inst | var_decl | monadic | dyadic | index | terms   }
+
+// block scopes
+block = { lbrace ~ thing ~ rbrace }
+
+// functions
+fn_outline = { visibility? ~ function ~ identifier ~ lparen ~ typed_args? ~ rparen ~ typed? }
+fn_decl = { fn_outline ~ block }
+fn_call = { identifier ~ lparen ~ args? ~ rparen }
+
+// variables
+var_decl = { visibility? ~ declaration ~ identifier ~ typed? ~ assignment ~ expr }
+
+// indexing
+index = { term ~ (("." ~ expr) | ("[" ~ expr ~ "]"))+ }
+
+// struct
+struct_inner = { lbrace ~ (named_var ~ (comma ~ named_var)*)* ~ rbrace }
+struct_decl = { visibility? ~ struct ~ identifier ~ struct_inner }
+struct_inst = { identifier ~ lbrace ~ (named_var ~ (comma ~ named_var)*)* ~ rbrace }
+
+// traits
+trait_decl = { visibility? ~ trait ~ identifier ~ lbrace ~ ((fn_outline ~ semicolon) | fn_decl)* ~ rbrace }
+
+// impl
+impl_decl = { impl ~ identifier ~ for ~ identifier ~ lbrace ~ fn_decl* ~ rbrace }
+
+// return
+ret_stmt = { ret ~ expr }
+
+// ltls
+ltl = { 
+    struct_decl | trait_decl | fn_decl | impl_decl | ret_stmt
+}
+
+thing = _{ (ltl | (expr ~ semicolon)) }
+program = _{ SOI ~ thing+ ~ EOI? }
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
