@@ -456,7 +456,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "petal"
+name = "petalang"
 version = "0.0.1"
 dependencies = [
  "clap",

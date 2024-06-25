@@ -1,5 +1,5 @@
 [package]
-name = "petal"
+name = "petalang"
 version = "0.0.1"
 edition = "2021"
 description = "A toy interpreted language"
