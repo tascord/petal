@@ -120,6 +120,17 @@ fn step_dyad<'a>(
             Dyadic::Pow => Object::Integer(Int::fit(a.to_max_value().pow(b.to_max_value() as u32))),
             Dyadic::Equality => Object::Bool(a.to_max_value() == b.to_max_value()),
         },
+        (Object::Bool(a), Object::Bool(b)) => match verb {
+            Dyadic::Equality => Object::Bool(a == b),
+            _ => {
+                return Err(partial!(
+                    "evaluating dyadic",
+                    format!("can't use verb {} on bools", verb.to_symbol()),
+                    span,
+                    h.clone()
+                ))
+            }
+        },
         (Object::String(a), Object::String(b)) => match verb {
             Dyadic::Add => Object::String(format!("{}{}", a, b)),
             Dyadic::Equality => Object::Bool(a == b),

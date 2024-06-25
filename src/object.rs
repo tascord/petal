@@ -46,18 +46,12 @@ impl<'a> Object<'a> {
         b: ContextualObject<'a>,
         h: Hydrator,
     ) -> Result<(ContextualObject<'a>, ContextualObject<'a>), Error> {
+        if std::mem::discriminant(&a.0) == std::mem::discriminant(&b.0) {
+            return Ok((a, b));
+        }
+
         // let span = extend(&[a.clone])
         Ok(match (a.clone().0, b.clone().0) {
-            // To Int
-            (Object::Integer(c), Object::Integer(d)) => (
-                Object::Integer(c).provide_context(a.1.clone()),
-                Object::Integer(d).provide_context(b.1.clone()),
-            ),
-            (Object::Float(c), Object::Float(d)) => (
-                Object::Float(c).provide_context(a.1.clone()),
-                Object::Float(d).provide_context(b.1.clone()),
-            ),
-
             // To Float
             (Object::Integer(c), Object::Float(d)) => (
                 Object::Float(Float::fit(c.to_max_value() as f64)).provide_context(a.1.clone()),
