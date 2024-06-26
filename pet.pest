@@ -38,6 +38,7 @@ ret = _{ "return" }
 boolean = { "true" | "false" }
 float = { ASCII_DIGIT* ~ "." ~ ASCII_DIGIT+ }
 int = { ASCII_DIGIT+ }
+null = { "null" }
 
 // strings
 string = ${ "\"" ~ inner ~ "\"" }
@@ -53,7 +54,7 @@ identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 
 /* ------------------------ */
 
-literal = _{ float | int | string | boolean }
+literal = _{ float | int | string | boolean | null }
 term = _{ literal | identifier | lparen ~ expr ~ rparen }
 terms = { term+ }
 
@@ -66,7 +67,7 @@ typed = _{ (colon ~ (identifier)) | slf }
 
 // expressions
 monadic = { (negative | negate) ~ term }
-dyadic = { term ~ (pow | equality | add | subtract | multiply | divide) ~ term }
+dyadic = { term ~ ((pow | equality | add | subtract | multiply | divide) ~ term)+ }
 expr = { fn_call | struct_inst | var_decl | monadic | dyadic | index | terms   }
 
 // block scopes

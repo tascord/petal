@@ -28,6 +28,7 @@ pub enum Node<'a> {
     Int(i128),
     Bool(bool),
     String(String),
+    Null,
 
     // Operators
     MondaicOp {
@@ -108,7 +109,7 @@ impl<'a> Program<'a> {
             };
 
             partial!(
-                "parsing",
+                "parsing input",
                 e.to_string(),
                 Span::new(&h.1.to_string(), span.0, span.1).unwrap(),
                 h

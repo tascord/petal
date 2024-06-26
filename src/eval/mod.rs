@@ -40,6 +40,7 @@ fn step<'a>(
         Node::Int(v) => Ok(Object::Integer(Int::fit(v)).provide_context(node.1.clone())),
         Node::Bool(v) => Ok(Object::Bool(v).provide_context(node.1.clone())),
         Node::String(v) => Ok(Object::String(v).provide_context(node.1.clone())),
+        Node::Null => Ok(Object::Null.provide_context(node.1.clone())),
 
         // Operations
         Node::DyadicOp { verb, lhs, rhs } => step_dyad(verb, *lhs, *rhs, scope, h.clone()),
@@ -58,7 +59,16 @@ fn step<'a>(
         }
 
         // Identifiers
-        Node::Ident(ident) => Ok(scope.borrow().get(&ident).unwrap().clone()),
+        Node::Ident(ident) => Ok(scope
+            .borrow()
+            .get(&ident)
+            .ok_or(partial!(
+                "finding variable",
+                format!("Unknown identifier: {}", ident),
+                node.1.clone(),
+                h.clone()
+            ))?
+            .clone()),
 
         // Builitins
         Node::FunctionCall { ident, args } => {

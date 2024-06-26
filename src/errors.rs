@@ -21,7 +21,7 @@ pub struct Error {
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Error parsing: {}", self.during_process)
+        write!(f, "Petal failed {}", self.during_process)
     }
 }
 
@@ -37,7 +37,7 @@ impl std::error::Error for Error {
 
 impl Diagnostic for Error {
     fn code<'a>(&'a self) -> Option<Box<dyn std::fmt::Display + 'a>> {
-        Some(Box::new(format!("Error parsing: {}", self.during_process)))
+        Some(Box::new(format!("Petal failed {}", self.during_process)))
     }
 
     fn severity(&self) -> Option<miette::Severity> {
@@ -91,7 +91,7 @@ pub fn make_source(h: &Hydrator) -> NamedSource<String> {
 macro_rules! partial {
     ($during:expr, $label:expr, $hint:expr, $span:expr, $h:expr) => {
         Error {
-            during_process: format!("Failed while {}", $during),
+            during_process: format!("while {}", $during),
             error: $label.to_string(),
             hint: Some($hint.to_string()),
 
@@ -105,7 +105,7 @@ macro_rules! partial {
     };
     ($during:expr, $label:expr, $span:expr, $h:expr) => {
         Error {
-            during_process: format!("Failed while {}", $during),
+            during_process: format!("while {}", $during),
             error: $label.to_string(),
             hint: None,
 

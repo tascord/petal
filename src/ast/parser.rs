@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use pest::iterators::Pair;
 
 use crate::{
@@ -28,7 +29,7 @@ pub fn build_ast_from_expr<'a>(e: Pair<'a, Rule>, h: Hydrator) -> NodeRes<'a> {
             })
         }
 
-        Rule::string | Rule::boolean | Rule::float | Rule::int | Rule::identifier => {
+        Rule::string | Rule::boolean | Rule::float | Rule::int | Rule::null | Rule::identifier => {
             build_ast_from_term(e.clone(), h)
         }
 
@@ -37,8 +38,16 @@ pub fn build_ast_from_expr<'a>(e: Pair<'a, Rule>, h: Hydrator) -> NodeRes<'a> {
             build_mondaic(verb, build!(expr, h), h)
         }
         Rule::dyadic => {
-            let (lhs, verb, rhs) = takes!(e.clone(), 3);
-            build_dyadic(verb, build!(lhs, h), build!(rhs, h), h)
+            let mut inner = e.clone().into_inner().rev();
+            let mut right = build!(inner.next().unwrap(), h);
+
+            for chunk in &inner.chunks(2) {
+                let (verb, left) = chunk.collect_tuple().unwrap();
+                let left = build!(left, h.clone());
+                right = build_dyadic(verb, left, right, h.clone())?;
+            }
+
+            Ok(right)
         }
 
         Rule::var_decl => {
@@ -171,6 +180,7 @@ fn build_ast_from_term<'a>(t: Pair<'a, Rule>, h: Hydrator) -> NodeRes<'a> {
         Rule::int => Ok(Node::Int(t.as_str().trim().parse::<i128>().map_err(
             |er| partial!("parsing integer", er.to_string(), t.as_span(), h.clone()),
         )?)),
+        Rule::null => Ok(Node::Null),
 
         _ => todo!(),
     }
