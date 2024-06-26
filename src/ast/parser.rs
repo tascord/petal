@@ -134,18 +134,12 @@ pub fn build_ast_from_expr<'a>(e: Pair<'a, Rule>, h: Hydrator) -> NodeRes<'a> {
         }
 
         Rule::index => {
-            let inner = e.clone().into_inner().into_iter();
-            let (ident, index) = make_index(inner.clone().next().unwrap());
-            let mut body = vec![];
-
-            let mut result = index;
-            while let Some(i) = result {
-                let a = make_index(i);
-                body.push(a.0);
-                result = a.1;
-            }
-
-            Ok(Node::Index(ident, body).provide_context(e.as_span()))
+            let (left, right) = takes!(e.clone(), 2);
+            Ok(Node::Index(
+                Box::new(build!(left, h.clone())),
+                Box::new(build!(right, h.clone())),
+            )
+            .provide_context(e.as_span()))
         }
 
         Rule::ret_stmt => {
@@ -219,15 +213,4 @@ fn build_dyadic<'a>(
         rhs: Box::new(rhs),
     }
     .provide_context(pair.as_span()))
-}
-
-fn make_index(p: Pair<Rule>) -> (String, Option<Pair<Rule>>) {
-    match p.as_rule() {
-        Rule::identifier => (p.as_str().to_string(), None),
-        Rule::index => {
-            let (ident, index) = takes!(p, 2);
-            (ident.as_str().to_string(), Some(index))
-        }
-        _ => unreachable!(),
-    }
 }

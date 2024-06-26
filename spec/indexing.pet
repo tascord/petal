@@ -1,0 +1,2 @@
+let v = "abc".len();
+print(v)

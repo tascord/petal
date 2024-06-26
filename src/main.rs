@@ -49,7 +49,7 @@ fn main() -> miette::Result<()> {
         }
     });
 
-    let scope = scope::Scope::new();
+    let scope = scope::Scope::new("#pet.global");
 
     files
         .map(|path| {

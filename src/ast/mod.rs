@@ -44,7 +44,7 @@ pub enum Node<'a> {
 
     Terms(Vec<ContextualNode<'a>>),
     Ident(String),
-    Index(String, Vec<String>),
+    Index(Box<ContextualNode<'a>>, Box<ContextualNode<'a>>),
     Return(Box<ContextualNode<'a>>),
 
     Delclaration {
@@ -134,6 +134,6 @@ impl<'a> Program<'a> {
 
     pub fn eval(self, scope: Option<MutScope<'a>>) -> miette::Result<ContextualObject<'a>> {
         let h = self.hydrator.clone();
-        eval(self, scope.unwrap_or(Scope::new()), h)
+        eval(self, scope.unwrap_or(Scope::new("#pet.repl")), h)
     }
 }

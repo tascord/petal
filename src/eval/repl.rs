@@ -80,7 +80,7 @@ pub fn repl<'a>() {
     println!("# {} repl", "petal".bright_magenta());
     println!("type 'exit' to exit\n");
 
-    let repl_scope = Scope::new();
+    let repl_scope = Scope::new("#pet.repl");
     let mut rl = rustyline::Editor::<PetalHinter, DefaultHistory>::new().unwrap();
     rl.set_helper(Some(PetalHinter(repl_scope.clone())));
 

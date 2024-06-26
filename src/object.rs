@@ -22,6 +22,7 @@ pub enum Object<'a> {
     // Function(Vec<Expr>, Block, Scope),
     Builtin(
         String,
+        bool,
         fn(Vec<ContextualObject<'a>>, Hydrator) -> Result<ContextualObject<'a>, Error>,
     ),
     Null,
@@ -93,7 +94,7 @@ impl<'a> Object<'a> {
             Object::Array(_) => "array",
             Object::Map(_) => "map",
             Object::Return(_) => "return",
-            Object::Builtin(_, _) => "builtin",
+            Object::Builtin(..) => "builtin",
             Object::Null => "null",
         }
         .to_string()
@@ -109,7 +110,7 @@ impl Display for Object<'_> {
             Object::String(v) => f.write_str(v.to_string().as_str()),
 
             Object::Return(v) => write!(f, "return {}", (*v.clone()).0.to_string()),
-            Object::Builtin(_, _) => f.write_str("#pet.builtin"),
+            Object::Builtin(..) => f.write_str("#pet.builtin"),
             Object::Null => write!(f, "null"),
 
             Object::Array(v) => write!(
