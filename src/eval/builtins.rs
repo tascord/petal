@@ -1,7 +1,7 @@
+use std::ops::RangeInclusive;
+
 use crate::{
-    errors::{Error, Hydrator},
-    helpers::extend,
-    object::{ContextualObject, Object},
+    errors::{Error, Hydrator}, eval::repl::ReplDisplay, helpers::extend, object::{ContextualObject, Object}
 };
 
 pub static BUILTINS: &[&str] = &["print"];
@@ -22,7 +22,7 @@ fn print<'a>(a: Vec<ContextualObject<'a>>, _: Hydrator) -> Result<ContextualObje
     println!(
         "{}",
         a.iter()
-            .map(|i| i.0.clone().to_string())
+            .map(|i| i.0.clone().pretty_print())
             .collect::<Vec<_>>()
             .join(", ")
     );
@@ -41,6 +41,32 @@ pub fn assert_args_len<'a>(
         return Err(partial!(
             "Invalid number of arguments",
             format!("Expected {} arguments, got {}", len, args.len()),
+            extend(
+                args.iter()
+                    .map(|a| a.1.clone())
+                    .collect::<Vec<_>>()
+                    .as_slice()
+            ),
+            h.clone()
+        ));
+    }
+    Ok(())
+}
+
+pub fn assert_args_range<'a>(
+    args: &Vec<ContextualObject<'a>>,
+    range: RangeInclusive<usize>,
+    h: Hydrator,
+) -> Result<(), Error> {
+    if !range.contains(&args.len()) {
+        return Err(partial!(
+            "Invalid number of arguments",
+            format!(
+                "Expected between {} and {} arguments, got {}",
+                range.start(),
+                range.end(),
+                args.len()
+            ),
             extend(
                 args.iter()
                     .map(|a| a.1.clone())

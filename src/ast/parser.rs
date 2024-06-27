@@ -29,9 +29,13 @@ pub fn build_ast_from_expr<'a>(e: Pair<'a, Rule>, h: Hydrator) -> NodeRes<'a> {
             })
         }
 
-        Rule::string | Rule::boolean | Rule::float | Rule::int | Rule::null | Rule::identifier => {
-            build_ast_from_term(e.clone(), h)
-        }
+        Rule::string
+        | Rule::boolean
+        | Rule::float
+        | Rule::int
+        | Rule::null
+        | Rule::identifier
+        | Rule::array => build_ast_from_term(e.clone(), h),
 
         Rule::monadic => {
             let (verb, expr) = takes!(e, 2);
@@ -174,6 +178,14 @@ fn build_ast_from_term<'a>(t: Pair<'a, Rule>, h: Hydrator) -> NodeRes<'a> {
         Rule::int => Ok(Node::Int(t.as_str().trim().parse::<i128>().map_err(
             |er| partial!("parsing integer", er.to_string(), t.as_span(), h.clone()),
         )?)),
+        Rule::array => {
+            let elements = t
+                .clone()
+                .into_inner()
+                .map(|t| build_ast_from_term(t, h.clone()))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(Node::Array(elements))
+        }
         Rule::null => Ok(Node::Null),
 
         _ => todo!(),

@@ -71,7 +71,7 @@ impl<'a> Scope<'a> {
         vars
     }
 
-    pub fn new_from_object(o: ContextualObject<'a>, h: Hydrator) -> Result<MutScope<'a>, Error> {
+    pub fn new_from_object(o: ContextualObject<'a>, _h: Hydrator) -> Result<MutScope<'a>, Error> {
         let mut scope = Scope {
             name: "object".to_string(),
             store: BTreeMap::new(),
@@ -95,14 +95,7 @@ impl<'a> Scope<'a> {
                     scope.set(&i.to_string(), Object::String(c.to_string()).anonymous());
                 }
             }
-            _ => {
-                return Err(partial!(
-                    "trying to index a non-indexable object",
-                    format!("Can't index object of type {}", o.0.typed()),
-                    o.1,
-                    h
-                ))
-            }
+            _ => {}
         }
 
         for intrinsic in list_instrinsics(&o.0.typed()) {

@@ -70,6 +70,8 @@ pub enum Node<'a> {
         typed: String,
         fields: Vec<(String, ContextualNode<'a>)>,
     },
+
+    Array(Vec<ContextualNode<'a>>),
 }
 
 impl<'a> Node<'a> {

@@ -35,12 +35,20 @@ fn step<'a>(
     scope: MutScope<'a>,
     h: Hydrator,
 ) -> Result<ContextualObject<'a>, Error> {
+    // println!("Step :: {:?}", node.0);
     match node.0.clone() {
         // Literals
         Node::Float(v) => Ok(Object::Float(Float::fit(v)).provide_context(node.1.clone())),
         Node::Int(v) => Ok(Object::Integer(Int::fit(v)).provide_context(node.1.clone())),
         Node::Bool(v) => Ok(Object::Bool(v).provide_context(node.1.clone())),
         Node::String(v) => Ok(Object::String(v).provide_context(node.1.clone())),
+        Node::Array(v) => {
+            let v = v
+                .into_iter()
+                .map(|n| step(&n, scope.clone(), h.clone()))
+                .try_collect()?;
+            Ok(Object::Array(v).provide_context(node.1.clone()))
+        }
         Node::Null => Ok(Object::Null.provide_context(node.1.clone())),
 
         // Operations
@@ -99,7 +107,6 @@ fn step<'a>(
                     }
 
                     let v = f(args, h.clone());
-                    println!("Returned: {:?}", v);
                     v
                 }
                 _ => Err(partial!(
@@ -131,7 +138,7 @@ fn step<'a>(
                         .get(&ident)
                         .ok_or(partial!(
                             "evaluating index",
-                            format!("Unknown identifier: {}", ident),
+                            format!("Unknown element: {}", ident),
                             right.1.clone(),
                             h.clone()
                         ))?

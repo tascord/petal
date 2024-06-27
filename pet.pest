@@ -54,7 +54,9 @@ identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 
 /* ------------------------ */
 
-literal = _{ float | int | string | boolean | null }
+array = { "[" ~ (expr | term) ~ ("," ~ (expr | term))* ~ "]" }
+
+literal = _{ float | int | string | boolean | array | null }
 term = _{ literal | identifier | lparen ~ expr ~ rparen }
 terms = { term+ }
 

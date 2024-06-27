@@ -1,2 +1,7 @@
-let v = "abc".len();
-print(v)
+let a = "Hello, world";
+let split_a = a.split();
+let reconstituted_a = split_a.join("");
+
+print(a);
+print(split_a);
+print(reconstituted_a);
