@@ -10,7 +10,7 @@ use crate::{
     types::{Float, Int, Num, VariablySized},
 };
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
 pub enum Object<'a> {
     Integer(Int),
     Float(Float),
@@ -38,8 +38,25 @@ impl<'a> Object<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct ContextualObject<'a>(pub Object<'a>, pub Span<'a>);
+
+impl PartialOrd for ContextualObject<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self.0.partial_cmp(&other.0) {
+            Some(core::cmp::Ordering::Equal) => {
+                self.1.start_pos().partial_cmp(&other.1.start_pos())
+            }
+            ord => ord,
+        }
+    }
+}
+
+impl Ord for ContextualObject<'_> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
 
 impl<'a> Object<'a> {
     pub fn coerce(

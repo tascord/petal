@@ -1,15 +1,29 @@
-use std::ops::RangeInclusive;
+use std::{collections::BTreeMap, ops::RangeInclusive};
 
 use crate::{
-    errors::{Error, Hydrator}, eval::repl::ReplDisplay, helpers::extend, object::{ContextualObject, Object}
+    errors::{Error, Hydrator},
+    eval::repl::ReplDisplay,
+    helpers::extend,
+    object::{ContextualObject, Object},
 };
 
-pub static BUILTINS: &[&str] = &["print"];
+pub static BUILTINS: &[&str] = &[];
 
 pub fn get_builtin<'a>(ident: &str) -> Option<ContextualObject<'a>> {
     Some(
         match ident {
-            "print" => Object::Builtin(ident.to_string(), false, print),
+            "term" => Object::Map({
+                let mut map: BTreeMap<ContextualObject, ContextualObject> = BTreeMap::new();
+                map.insert(
+                    Object::String("print".to_string()).anonymous(),
+                    Object::Builtin("print".to_string(), false, print).anonymous(),
+                );
+                map.insert(
+                    Object::String("clear".to_string()).anonymous(),
+                    Object::Builtin("clear".to_string(), false, clear).anonymous(),
+                );
+                map
+            }),
             _ => return None,
         }
         .anonymous(),
@@ -27,6 +41,11 @@ fn print<'a>(a: Vec<ContextualObject<'a>>, _: Hydrator) -> Result<ContextualObje
             .join(", ")
     );
 
+    Ok(Object::Null.anonymous())
+}
+
+fn clear<'a>(_: Vec<ContextualObject<'a>>, _: Hydrator) -> Result<ContextualObject<'a>, Error> {
+    print!("\x1B[2J\x1B[1;1H");
     Ok(Object::Null.anonymous())
 }
 

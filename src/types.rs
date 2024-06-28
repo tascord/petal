@@ -23,7 +23,7 @@ pub trait Num {
 
 //
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, PartialOrd, Eq)]
 pub enum Int {
     _8(i8),
     _16(i16),
@@ -63,9 +63,15 @@ impl PartialEq for Int {
     }
 }
 
+impl Ord for Int {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.to_max_value().cmp(&other.to_max_value())
+    }
+}
+
 //
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialOrd)]
 pub enum Float {
     _32(f32),
     _64(f64),
@@ -93,5 +99,15 @@ impl VariablySized for Float {
 impl PartialEq for Float {
     fn eq(&self, other: &Self) -> bool {
         self.to_max_value() == other.to_max_value()
+    }
+}
+
+impl Eq for Float {}
+
+impl Ord for Float {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.to_max_value()
+            .partial_cmp(&other.to_max_value())
+            .unwrap()
     }
 }

@@ -138,12 +138,13 @@ pub fn build_ast_from_expr<'a>(e: Pair<'a, Rule>, h: Hydrator) -> NodeRes<'a> {
         }
 
         Rule::index => {
-            let (left, right) = takes!(e.clone(), 2);
-            Ok(Node::Index(
-                Box::new(build!(left, h.clone())),
-                Box::new(build!(right, h.clone())),
-            )
-            .provide_context(e.as_span()))
+            let mut body = e.clone().into_inner();
+            let item = build!(body.next().unwrap(), h.clone());
+            let rest = body
+                .map(|i| build_ast_from_expr(i, h.clone()))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            Ok(Node::Index(Box::new(item), rest).provide_context(e.as_span()))
         }
 
         Rule::ret_stmt => {

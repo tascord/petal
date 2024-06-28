@@ -44,7 +44,7 @@ pub enum Node<'a> {
 
     Terms(Vec<ContextualNode<'a>>),
     Ident(String),
-    Index(Box<ContextualNode<'a>>, Box<ContextualNode<'a>>),
+    Index(Box<ContextualNode<'a>>, Vec<ContextualNode<'a>>),
     Return(Box<ContextualNode<'a>>),
 
     Delclaration {

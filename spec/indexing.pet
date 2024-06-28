@@ -1,7 +1,2 @@
-let a = "Hello, world";
-let split_a = a.split();
-let reconstituted_a = split_a.join("");
-
-print(a);
-print(split_a);
-print(reconstituted_a);
+let v = 123.to_string().split("");
+print(v);

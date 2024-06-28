@@ -121,67 +121,77 @@ fn step<'a>(
         // Indexing
         Node::Index(left, right) => {
             let left = step(&*left, scope.clone(), h.clone())?;
-            let container: MutScope<'a> = Scope::new_from_object(left, h.clone())?;
+            let mut container: MutScope<'a> = Scope::new_from_object(left, h.clone())?;
 
-            Ok(match right.0 {
-                Node::Int(v) => container
-                    .borrow()
-                    .get(&v.to_string())
-                    .unwrap_or(Object::Null.anonymous()),
-                Node::String(v) | Node::Ident(v) => container
-                    .borrow()
-                    .get(&v)
-                    .unwrap_or(Object::Null.anonymous()),
-                Node::FunctionCall { ident, args } => {
-                    match container
+            for (index, item) in right.clone().into_iter().enumerate() {
+                let obj = match item.0 {
+                    Node::Int(v) => container
                         .borrow()
-                        .get(&ident)
-                        .ok_or(partial!(
-                            "evaluating index",
-                            format!("Unknown element: {}", ident),
-                            right.1.clone(),
-                            h.clone()
-                        ))?
-                        .0
-                    {
-                        Object::Builtin(_, slf, f) => {
-                            let mut args: Vec<ContextualObject<'a>> = args
-                                .into_iter()
-                                .map(|a| step(&a, container.clone(), h.clone()))
-                                .try_collect()?;
-
-                            if slf {
-                                let slf = container.borrow().get_self().ok_or(partial!(
-                                    "evaluating function call",
-                                    "No self provided for method call".to_string(),
-                                    right.1.clone(),
-                                    h.clone()
-                                ))?;
-
-                                args.insert(0, slf.clone());
-                            }
-
-                            f(args, h.clone())?
-                        }
-                        _ => {
-                            return Err(partial!(
+                        .get(&v.to_string())
+                        .unwrap_or(Object::Null.anonymous()),
+                    Node::String(v) | Node::Ident(v) => container
+                        .borrow()
+                        .get(&v)
+                        .unwrap_or(Object::Null.anonymous()),
+                    Node::FunctionCall { ident, args } => {
+                        match container
+                            .borrow()
+                            .get(&ident)
+                            .ok_or(partial!(
                                 "evaluating index",
-                                format!("Can't index with this type"),
-                                right.1.clone(),
+                                format!("Unknown element: {}", ident),
+                                item.1.clone(),
                                 h.clone()
-                            ))
+                            ))?
+                            .0
+                        {
+                            Object::Builtin(_, slf, f) => {
+                                let mut args: Vec<ContextualObject<'a>> = args
+                                    .into_iter()
+                                    .map(|a| step(&a, container.clone(), h.clone()))
+                                    .try_collect()?;
+
+                                if slf {
+                                    let slf = container.borrow().get_self().ok_or(partial!(
+                                        "evaluating function call",
+                                        "No self provided for method call".to_string(),
+                                        item.1.clone(),
+                                        h.clone()
+                                    ))?;
+
+                                    args.insert(0, slf.clone());
+                                }
+
+                                f(args, h.clone())?
+                            }
+                            _ => {
+                                return Err(partial!(
+                                    "evaluating index",
+                                    format!("Can't index with this type"),
+                                    item.1.clone(),
+                                    h.clone()
+                                ))
+                            }
                         }
                     }
+                    _ => {
+                        return Err(partial!(
+                            "evaluating index",
+                            "Can't index with this type".to_string(),
+                            item.1.clone(),
+                            h.clone()
+                        ))
+                    }
+                };
+
+                if index == right.len() - 1 {
+                    return Ok(obj);
+                } else {
+                    container = Scope::new_from_object(obj, h.clone())?;
                 }
-                _ => {
-                    return Err(partial!(
-                        "evaluating index",
-                        "Can't index with this type".to_string(),
-                        right.1.clone(),
-                        h.clone()
-                    ))
-                }
-            })
+            }
+
+            Ok(Object::Null.anonymous())
         }
 
         _ => todo!(),
