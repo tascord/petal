@@ -219,6 +219,14 @@ fn step_dyad<'a>(
             Dyadic::Divide => Object::Float(Float::fit(a.to_max_value() / b.to_max_value())),
             Dyadic::Pow => Object::Float(Float::fit(a.to_max_value().powf(b.to_max_value()))),
             Dyadic::Equality => Object::Bool(a.to_max_value() == b.to_max_value()),
+            _ => {
+                return Err(partial!(
+                    "evaluating dyadic",
+                    format!("can't use verb {} on floats", verb.to_symbol()),
+                    span,
+                    h.clone()
+                ))
+            }
         },
         (Object::Integer(a), Object::Integer(b)) => match verb {
             Dyadic::Add => Object::Integer(Int::fit(a.to_max_value() + b.to_max_value())),
@@ -227,9 +235,19 @@ fn step_dyad<'a>(
             Dyadic::Divide => Object::Integer(Int::fit(a.to_max_value() / b.to_max_value())),
             Dyadic::Pow => Object::Integer(Int::fit(a.to_max_value().pow(b.to_max_value() as u32))),
             Dyadic::Equality => Object::Bool(a.to_max_value() == b.to_max_value()),
+            _ => {
+                return Err(partial!(
+                    "evaluating dyadic",
+                    format!("can't use verb {} on integers", verb.to_symbol()),
+                    span,
+                    h.clone()
+                ))
+            }
         },
         (Object::Bool(a), Object::Bool(b)) => match verb {
             Dyadic::Equality => Object::Bool(a == b),
+            Dyadic::Or => Object::Bool(a || b),
+            Dyadic::And => Object::Bool(a && b),
             _ => {
                 return Err(partial!(
                     "evaluating dyadic",

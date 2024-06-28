@@ -15,6 +15,8 @@ thread_local! {
         m.insert("-", Dyadic::Subtract);
         m.insert("*", Dyadic::Multiply);
         m.insert("/", Dyadic::Divide);
+        m.insert("||", Dyadic::Or);
+        m.insert("&&", Dyadic::And);
         m
     };
 }
@@ -54,6 +56,8 @@ pub enum Dyadic {
     Subtract,
     Multiply,
     Divide,
+    And,
+    Or
 }
 
 impl Dyadic {

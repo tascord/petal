@@ -9,6 +9,8 @@ add = { "+" }
 subtract = { "-" }
 multiply = { "*" }
 divide = { "/" }
+or = { "||" }
+and = { "&&" }
 
 // delimiters
 lparen = _{ "(" }
@@ -69,7 +71,7 @@ typed = _{ (colon ~ (identifier)) | slf }
 
 // expressions
 monadic = { (negative | negate) ~ term }
-dyadic = { term ~ ((pow | equality | add | subtract | multiply | divide) ~ term)+ }
+dyadic = { term ~ ((pow | equality | add | subtract | multiply | divide | or | and) ~ term)+ }
 expr = { fn_call | struct_inst | var_decl | monadic | dyadic | index | terms   }
 
 // block scopes
