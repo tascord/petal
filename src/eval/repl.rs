@@ -1,9 +1,7 @@
 use itertools::Itertools;
 use owo_colors::OwoColorize;
 use rustyline::{
-    hint::{Hint, Hinter},
-    history::DefaultHistory,
-    Completer, Helper, Highlighter, Validator,
+    config::Configurer, hint::{Hint, Hinter}, history::DefaultHistory, Completer, Helper, Highlighter, Validator
 };
 
 use crate::{
@@ -39,9 +37,8 @@ impl<'a> Hinter for PetalHinter<'a> {
     type Hint = CommandHint;
 
     fn hint(&self, line: &str, pos: usize, _ctx: &rustyline::Context<'_>) -> Option<Self::Hint> {
-        
         let (snip, cut) = &get_snippet_from_line(line);
-        
+
         if pos == 0 || snip.trim().is_empty() {
             return None;
         }
@@ -83,6 +80,7 @@ pub fn repl<'a>() {
     let repl_scope = Scope::new("#pet.repl");
     let mut rl = rustyline::Editor::<PetalHinter, DefaultHistory>::new().unwrap();
     rl.set_helper(Some(PetalHinter(repl_scope.clone())));
+    rl.set_auto_add_history(true);
 
     loop {
         let scope = repl_scope.clone();

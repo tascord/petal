@@ -10,6 +10,7 @@ pub fn list_instrinsics(typed: &str) -> &[&str] {
     match typed {
         "string" => &["to_string", "len", "split"],
         "array" => &["to_string", "len", "join"],
+        "map" => &["to_string", "keys", "values", "entries"],
         _ => &["to_string"],
     }
 }
@@ -21,6 +22,9 @@ pub fn get_intrinsic<'a>(ident: &str) -> Option<ContextualObject<'a>> {
             "len" => Object::Builtin(ident.to_string(), true, len),
             "split" => Object::Builtin(ident.to_string(), true, split),
             "join" => Object::Builtin(ident.to_string(), true, join),
+            "keys" => Object::Builtin(ident.to_string(), true, keys),
+            "values" => Object::Builtin(ident.to_string(), true, values),
+            "entries" => Object::Builtin(ident.to_string(), true, entries),
             _ => return None,
         }
         .anonymous(),
@@ -130,6 +134,65 @@ fn join<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObjec
             .map(|o| o.0.to_string())
             .collect::<Vec<_>>()
             .join(sep),
+    )
+    .anonymous())
+}
+
+fn keys<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObject<'a>, Error> {
+    assert_args_len(&a, 1, h.clone())?;
+    let v = a.first().unwrap();
+    let v = match &v.0 {
+        Object::Map(v) => v,
+        _ => {
+            return Err(partial!(
+                "checking types",
+                format!("Can't get keys of type {}", v.0.typed()),
+                v.1,
+                h.clone()
+            ))
+        }
+    };
+
+    Ok(Object::Array(v.keys().map(|k| k.clone()).collect::<Vec<_>>()).anonymous())
+}
+
+fn values<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObject<'a>, Error> {
+    assert_args_len(&a, 1, h.clone())?;
+    let v = a.first().unwrap();
+    let v = match &v.0 {
+        Object::Map(v) => v,
+        _ => {
+            return Err(partial!(
+                "checking types",
+                format!("Can't get values of type {}", v.0.typed()),
+                v.1,
+                h.clone()
+            ))
+        }
+    };
+
+    Ok(Object::Array(v.values().map(|v| v.clone()).collect::<Vec<_>>()).anonymous())
+}
+
+fn entries<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObject<'a>, Error> {
+    assert_args_len(&a, 1, h.clone())?;
+    let v = a.first().unwrap();
+    let v = match &v.0 {
+        Object::Map(v) => v,
+        _ => {
+            return Err(partial!(
+                "checking types",
+                format!("Can't get entries of type {}", v.0.typed()),
+                v.1,
+                h.clone()
+            ))
+        }
+    };
+
+    Ok(Object::Array(
+        v.iter()
+            .map(|(k, v)| Object::Array(vec![k.clone(), v.clone()]).anonymous())
+            .collect::<Vec<_>>(),
     )
     .anonymous())
 }

@@ -127,7 +127,7 @@ impl Display for Object<'_> {
             Object::String(v) => f.write_str(v.to_string().as_str()),
 
             Object::Return(v) => write!(f, "return {}", (*v.clone()).0.to_string()),
-            Object::Builtin(..) => f.write_str("#pet.builtin"),
+            Object::Builtin(name, ..) => write!(f, "#pet.builtin({name})"),
             Object::Null => write!(f, "null"),
 
             Object::Array(v) => write!(
@@ -185,7 +185,7 @@ impl ReplDisplay for Object<'_> {
                     .join(", ")
             ),
             Object::Return(v) => format!("{} {}", "return".red(), v.0.pretty_print()),
-            Object::Builtin(..) => "#pet.builtin".purple().to_string(),
+            Object::Builtin(name, ..) => format!("{}({})", "#pet.builtin".purple().to_string(), name.magenta().to_string()),
             Object::Null => "null".magenta().to_string(),
         }
     }
