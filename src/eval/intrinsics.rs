@@ -1,6 +1,9 @@
+use itertools::Itertools;
+
 use crate::{
     errors::{Error, Hydrator},
     object::{ContextualObject, Object},
+    scope::MutScope,
     types::{Int, VariablySized},
 };
 
@@ -9,7 +12,7 @@ use super::builtins::{assert_args_len, assert_args_range};
 pub fn list_instrinsics(typed: &str) -> &[&str] {
     match typed {
         "string" => &["to_string", "len", "split"],
-        "array" => &["to_string", "len", "join"],
+        "array" => &["to_string", "len", "join", "map"],
         "map" => &["to_string", "keys", "values", "entries"],
         _ => &["to_string"],
     }
@@ -25,6 +28,7 @@ pub fn get_intrinsic<'a>(ident: &str) -> Option<ContextualObject<'a>> {
             "keys" => Object::Builtin(ident.to_string(), true, keys),
             "values" => Object::Builtin(ident.to_string(), true, values),
             "entries" => Object::Builtin(ident.to_string(), true, entries),
+            "map" => Object::Builtin(ident.to_string(), true, map),
             _ => return None,
         }
         .anonymous(),
@@ -33,12 +37,12 @@ pub fn get_intrinsic<'a>(ident: &str) -> Option<ContextualObject<'a>> {
 
 //
 
-fn to_string<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObject<'a>, Error> {
+fn to_string<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator, _: MutScope<'a>) -> Result<ContextualObject<'a>, Error> {
     assert_args_len(&a, 1, h.clone())?;
     Ok(Object::String(a.first().unwrap().0.to_string()).anonymous())
 }
 
-fn len<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObject<'a>, Error> {
+fn len<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator, _: MutScope<'a>) -> Result<ContextualObject<'a>, Error> {
     assert_args_len(&a, 1, h.clone())?;
     let v = a.first().unwrap();
     Ok(Object::Integer(Int::fit(match &v.0.clone() {
@@ -56,7 +60,7 @@ fn len<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObject
     .anonymous())
 }
 
-fn split<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObject<'a>, Error> {
+fn split<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator, _: MutScope<'a>) -> Result<ContextualObject<'a>, Error> {
     assert_args_range(&a, 1..=2, h.clone())?;
 
     let (v, sep) = (
@@ -102,7 +106,7 @@ fn split<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObje
     Ok(Object::Array(split).anonymous())
 }
 
-fn join<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObject<'a>, Error> {
+fn join<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator, _: MutScope<'a>) -> Result<ContextualObject<'a>, Error> {
     assert_args_len(&a, 2, h.clone())?;
     let (v, sep) = (a.first().unwrap(), a.last().unwrap());
     let sep = match &sep.0 {
@@ -138,7 +142,7 @@ fn join<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObjec
     .anonymous())
 }
 
-fn keys<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObject<'a>, Error> {
+fn keys<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator, _: MutScope<'a>) -> Result<ContextualObject<'a>, Error> {
     assert_args_len(&a, 1, h.clone())?;
     let v = a.first().unwrap();
     let v = match &v.0 {
@@ -156,7 +160,7 @@ fn keys<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObjec
     Ok(Object::Array(v.keys().map(|k| k.clone()).collect::<Vec<_>>()).anonymous())
 }
 
-fn values<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObject<'a>, Error> {
+fn values<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator, _: MutScope<'a>) -> Result<ContextualObject<'a>, Error> {
     assert_args_len(&a, 1, h.clone())?;
     let v = a.first().unwrap();
     let v = match &v.0 {
@@ -174,7 +178,7 @@ fn values<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObj
     Ok(Object::Array(v.values().map(|v| v.clone()).collect::<Vec<_>>()).anonymous())
 }
 
-fn entries<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualObject<'a>, Error> {
+fn entries<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator, _: MutScope<'a>) -> Result<ContextualObject<'a>, Error> {
     assert_args_len(&a, 1, h.clone())?;
     let v = a.first().unwrap();
     let v = match &v.0 {
@@ -195,4 +199,38 @@ fn entries<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator) -> Result<ContextualOb
             .collect::<Vec<_>>(),
     )
     .anonymous())
+}
+
+fn map<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator, s: MutScope<'a>) -> Result<ContextualObject<'a>, Error> {
+    assert_args_len(&a, 2, h.clone())?;
+    let (v, f) = (a.first().unwrap(), a.last().unwrap());
+    let v = match &v.0 {
+        Object::Array(v) => v,
+        _ => {
+            return Err(partial!(
+                "checking types",
+                format!("Can't map type {}", v.0.typed()),
+                v.1,
+                h.clone()
+            ))
+        }
+    };
+
+    let f = match &f.0 {
+        Object::Lambda(..) => f,
+        Object::Builtin(..) => f,
+        _ => {
+            return Err(partial!(
+                "checking types",
+                format!("Can't map with type {}", f.0.typed()),
+                f.1,
+                h.clone()
+            ))
+        }
+    };
+
+    v.into_iter()
+        .map(|v| f.call(vec![v.clone()], s.clone(), h.clone()))
+        .try_collect()
+        .map(|v| Object::Array(v).anonymous())
 }

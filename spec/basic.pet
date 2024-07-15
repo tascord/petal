@@ -1,2 +1,2 @@
 let greeting = "Hello, ";
-print(greeting + "Flora!");
+term.print(greeting + "Flora!");

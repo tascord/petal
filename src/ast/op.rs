@@ -17,6 +17,10 @@ thread_local! {
         m.insert("/", Dyadic::Divide);
         m.insert("||", Dyadic::Or);
         m.insert("&&", Dyadic::And);
+        m.insert(">", Dyadic::GreaterThan);
+        m.insert("<", Dyadic::LessThan);
+        m.insert(">=", Dyadic::GreaterThanOrEqual);
+        m.insert("<=", Dyadic::LessThanOrEqual);
         m
     };
 }
@@ -37,7 +41,7 @@ pub fn get_monads() -> Vec<String> {
     MONDAIC_SYMBOL_MAP.with(|m| m.keys().copied().map(|s| s.to_string()).collect())
 }
 
-#[derive(Debug, Hash, Copy, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Hash, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Mondaic {
     Negate,
 }
@@ -48,7 +52,7 @@ impl Mondaic {
     }
 }
 
-#[derive(Debug, Hash, Copy, Clone, PartialEq)]
+#[derive(Debug, Hash, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Dyadic {
     Pow,
     Equality,
@@ -57,7 +61,11 @@ pub enum Dyadic {
     Multiply,
     Divide,
     And,
-    Or
+    Or,
+    GreaterThan,
+    LessThan,
+    GreaterThanOrEqual,
+    LessThanOrEqual,
 }
 
 impl Dyadic {

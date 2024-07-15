@@ -1,2 +1,2 @@
 let v = 123.to_string().split("");
-print(v);
+term.print(v[1]);

@@ -1,38 +1,33 @@
 use std::{collections::BTreeMap, ops::RangeInclusive};
 
 use crate::{
-    errors::{Error, Hydrator},
-    eval::repl::ReplDisplay,
-    helpers::extend,
-    object::{ContextualObject, Object},
-    types::Num,
+    errors::{Error, Hydrator}, eval::repl::ReplDisplay, helpers::extend, object::{ContextualObject, Object}, scope::MutScope, types::Num
 };
 
 pub static BUILTINS: &[&str] = &[];
 
+macro_rules! map {
+    ([$($name:expr),+ $(,)?]) => {
+        Object::Map({
+            let mut map: BTreeMap<ContextualObject, ContextualObject> = BTreeMap::new();
+
+            $(
+                map.insert(
+                    Object::String(stringify!($name).to_string()).anonymous(),
+                    Object::Builtin(stringify!($name).to_string(), false, $name).anonymous(),
+                );
+            )+
+
+            map
+        })
+    };
+}
+
 pub fn get_builtin<'a>(ident: &str) -> Option<ContextualObject<'a>> {
     Some(
         match ident {
-            "term" => Object::Map({
-                let mut map: BTreeMap<ContextualObject, ContextualObject> = BTreeMap::new();
-                map.insert(
-                    Object::String("print".to_string()).anonymous(),
-                    Object::Builtin("print".to_string(), false, print).anonymous(),
-                );
-                map.insert(
-                    Object::String("clear".to_string()).anonymous(),
-                    Object::Builtin("clear".to_string(), false, clear).anonymous(),
-                );
-                map
-            }),
-            "process" => Object::Map({
-                let mut map: BTreeMap<ContextualObject, ContextualObject> = BTreeMap::new();
-                map.insert(
-                    Object::String("exit".to_string()).anonymous(),
-                    Object::Builtin("exit".to_string(), false, exit).anonymous(),
-                );
-                map
-            }),
+            "term" => map!([print, clear]),
+            "process" => map!([exit]),
             _ => return None,
         }
         .anonymous(),
@@ -41,7 +36,7 @@ pub fn get_builtin<'a>(ident: &str) -> Option<ContextualObject<'a>> {
 
 //
 
-fn exit(a: Vec<ContextualObject>, h: Hydrator) -> Result<ContextualObject, Error> {
+fn exit<'a>(a: Vec<ContextualObject<'a>>, h: Hydrator, _: MutScope<'a>) -> Result<ContextualObject<'a>, Error> {
     assert_args_range(&a, 0..=1, h.clone())?;
     std::process::exit(
         match &a
@@ -64,7 +59,7 @@ fn exit(a: Vec<ContextualObject>, h: Hydrator) -> Result<ContextualObject, Error
 
 //
 
-fn print<'a>(a: Vec<ContextualObject<'a>>, _: Hydrator) -> Result<ContextualObject<'a>, Error> {
+fn print<'a>(a: Vec<ContextualObject<'a>>, _: Hydrator, _: MutScope<'a>) -> Result<ContextualObject<'a>, Error> {
     println!(
         "{}",
         a.iter()
@@ -76,7 +71,7 @@ fn print<'a>(a: Vec<ContextualObject<'a>>, _: Hydrator) -> Result<ContextualObje
     Ok(Object::Null.anonymous())
 }
 
-fn clear<'a>(_: Vec<ContextualObject<'a>>, _: Hydrator) -> Result<ContextualObject<'a>, Error> {
+fn clear<'a>(_: Vec<ContextualObject<'a>>, _: Hydrator, _: MutScope<'a>) -> Result<ContextualObject<'a>, Error> {
     print!("\x1B[2J\x1B[1;1H");
     Ok(Object::Null.anonymous())
 }

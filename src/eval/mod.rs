@@ -12,6 +12,7 @@ use crate::{
 pub mod builtins;
 pub mod intrinsics;
 pub mod repl;
+pub mod tasks;
 
 pub fn eval<'a>(
     prog: Program<'a>,
@@ -30,7 +31,7 @@ pub fn eval<'a>(
     Ok(result)
 }
 
-fn step<'a>(
+pub fn step<'a>(
     node: &ContextualNode<'a>,
     scope: MutScope<'a>,
     h: Hydrator,
@@ -57,8 +58,18 @@ fn step<'a>(
         // Variables
         Node::Delclaration { ident, expr, .. } => {
             let value = step(&*expr, scope.clone(), h.clone())?;
-            scope.borrow_mut().set(&ident, value);
-            Ok(Object::Null.anonymous())
+            scope
+                .borrow_mut()
+                .set(&ident, value.clone(), node.1, h.clone())?;
+            Ok(value)
+        }
+
+        Node::Assignment { ident, expr } => {
+            let value = step(&*expr, scope.clone(), h.clone())?;
+            scope
+                .borrow_mut()
+                .assign(&ident, value.clone(), node.1, h.clone())?;
+            Ok(value)
         }
 
         // Return
@@ -78,7 +89,7 @@ fn step<'a>(
             ))?
             .clone()),
 
-        // Builitins
+        // Functions
         Node::FunctionCall { ident, args } => {
             let v = scope.borrow().get(&ident).ok_or(partial!(
                 "evaluating function call",
@@ -89,26 +100,15 @@ fn step<'a>(
 
             let v = v.clone();
             match v.0 {
-                Object::Builtin(_, needs_self, f) => {
-                    let mut args: Vec<ContextualObject<'a>> = args
+                Object::Builtin(..) | Object::Lambda(..) => {
+                    let args = args
                         .into_iter()
                         .map(|a| step(&a, scope.clone(), h.clone()))
                         .try_collect()?;
 
-                    if needs_self {
-                        let slf = scope.borrow().get_self().ok_or(partial!(
-                            "evaluating function call",
-                            "No self provided for method call".to_string(),
-                            node.1.clone(),
-                            h.clone()
-                        ))?;
-
-                        args.insert(0, slf.clone());
-                    }
-
-                    let v = f(args, h.clone());
-                    v
+                    v.call(args, scope.clone(), h)
                 }
+
                 _ => Err(partial!(
                     "evaluating function call",
                     format!("{} is not a function", ident),
@@ -121,7 +121,7 @@ fn step<'a>(
         // Indexing
         Node::Index(left, right) => {
             let left = step(&*left, scope.clone(), h.clone())?;
-            let mut container: MutScope<'a> = Scope::new_from_object(left, h.clone())?;
+            let mut container: MutScope<'a> = Scope::new_from_object(left, scope.clone())?;
 
             for (index, item) in right.clone().into_iter().enumerate() {
                 let obj = match item.0 {
@@ -134,7 +134,7 @@ fn step<'a>(
                         .get(&v)
                         .unwrap_or(Object::Null.anonymous()),
                     Node::FunctionCall { ident, args } => {
-                        match container
+                        let object = container
                             .borrow()
                             .get(&ident)
                             .ok_or(partial!(
@@ -143,13 +143,19 @@ fn step<'a>(
                                 item.1.clone(),
                                 h.clone()
                             ))?
-                            .0
-                        {
+                            .0;
+
+                        match object {
                             Object::Builtin(_, slf, f) => {
+                                let prev = container.borrow().name.clone();
+                                container.clone().borrow_mut().name = "object_fncall".to_string();
+
                                 let mut args: Vec<ContextualObject<'a>> = args
                                     .into_iter()
                                     .map(|a| step(&a, container.clone(), h.clone()))
                                     .try_collect()?;
+
+                                container.clone().borrow_mut().name = prev;
 
                                 if slf {
                                     let slf = container.borrow().get_self().ok_or(partial!(
@@ -162,7 +168,7 @@ fn step<'a>(
                                     args.insert(0, slf.clone());
                                 }
 
-                                f(args, h.clone())?
+                                f(args, h.clone(), scope.clone())?
                             }
                             _ => {
                                 return Err(partial!(
@@ -187,11 +193,64 @@ fn step<'a>(
                 if index == right.len() - 1 {
                     return Ok(obj);
                 } else {
-                    container = Scope::new_from_object(obj, h.clone())?;
+                    container = Scope::new_from_object(obj, scope.clone())?;
                 }
             }
 
             Ok(Object::Null.anonymous())
+        }
+
+        Node::Lambda {
+            args,
+            return_type,
+            body,
+        } => Ok(Object::Lambda(args, return_type, body).provide_context(node.1.clone())),
+
+        Node::Conditional { arms, else_arm } => {
+            for (cond, body) in arms {
+                let cond = step(&cond, scope.clone(), h.clone())?;
+                if let Object::Bool(true) = cond.0 {
+                    for node in body {
+                        let result = step(&node, scope.clone(), h.clone())?;
+                        if let Object::Return(expr) = &result.0 {
+                            return Ok(*expr.clone());
+                        }
+                    }
+                    return Ok(Object::Null.anonymous());
+                }
+            }
+
+            if let Some(else_arm) = else_arm {
+                for node in else_arm {
+                    let result = step(&node, scope.clone(), h.clone())?;
+                    if let Object::Return(expr) = &result.0 {
+                        return Ok(*expr.clone());
+                    }
+                }
+            }
+
+            Ok(Object::Null.anonymous())
+        }
+
+        Node::LoopWhile { condition, body } => {
+            let mut loops = 0;
+
+            loop {
+                loops += 1;
+                let cond = step(&*condition, scope.clone(), h.clone())?;
+                if let Object::Bool(true) = cond.0 {
+                    for node in &body {
+                        let result = step(&node, scope.clone(), h.clone())?;
+                        if let Object::Return(expr) = &result.0 {
+                            return Ok(*expr.clone());
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            Ok(Object::Integer(Int::fit(loops)).anonymous())
         }
 
         _ => todo!(),
@@ -219,6 +278,10 @@ fn step_dyad<'a>(
             Dyadic::Divide => Object::Float(Float::fit(a.to_max_value() / b.to_max_value())),
             Dyadic::Pow => Object::Float(Float::fit(a.to_max_value().powf(b.to_max_value()))),
             Dyadic::Equality => Object::Bool(a.to_max_value() == b.to_max_value()),
+            Dyadic::GreaterThan => Object::Bool(a.to_max_value() > b.to_max_value()),
+            Dyadic::LessThan => Object::Bool(a.to_max_value() < b.to_max_value()),
+            Dyadic::GreaterThanOrEqual => Object::Bool(a.to_max_value() >= b.to_max_value()),
+            Dyadic::LessThanOrEqual => Object::Bool(a.to_max_value() <= b.to_max_value()),
             _ => {
                 return Err(partial!(
                     "evaluating dyadic",
@@ -235,6 +298,10 @@ fn step_dyad<'a>(
             Dyadic::Divide => Object::Integer(Int::fit(a.to_max_value() / b.to_max_value())),
             Dyadic::Pow => Object::Integer(Int::fit(a.to_max_value().pow(b.to_max_value() as u32))),
             Dyadic::Equality => Object::Bool(a.to_max_value() == b.to_max_value()),
+            Dyadic::GreaterThan => Object::Bool(a.to_max_value() > b.to_max_value()),
+            Dyadic::LessThan => Object::Bool(a.to_max_value() < b.to_max_value()),
+            Dyadic::GreaterThanOrEqual => Object::Bool(a.to_max_value() >= b.to_max_value()),
+            Dyadic::LessThanOrEqual => Object::Bool(a.to_max_value() <= b.to_max_value()),
             _ => {
                 return Err(partial!(
                     "evaluating dyadic",

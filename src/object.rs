@@ -4,9 +4,11 @@ use owo_colors::OwoColorize;
 use pest::Span;
 
 use crate::{
+    ast::ContextualNode,
     errors::{Error, Hydrator},
-    eval::repl::ReplDisplay,
+    eval::{repl::ReplDisplay, step},
     helpers::extend,
+    scope::{MutScope, Scope},
     types::{Float, Int, Num, VariablySized},
 };
 
@@ -23,8 +25,13 @@ pub enum Object<'a> {
     Builtin(
         String,
         bool,
-        fn(Vec<ContextualObject<'a>>, Hydrator) -> Result<ContextualObject<'a>, Error>,
+        fn(
+            Vec<ContextualObject<'a>>,
+            Hydrator,
+            MutScope<'a>,
+        ) -> Result<ContextualObject<'a>, Error>,
     ),
+    Lambda(Vec<String>, Option<String>, Vec<ContextualNode<'a>>),
     Null,
 }
 
@@ -86,8 +93,8 @@ impl<'a> Object<'a> {
                 b,
             ),
             (Object::String(_), _) => (
-                a.clone(),
-                Object::String(a.0.to_string()).provide_context(b.1.clone()),
+                a,
+                Object::String(b.0.to_string()).provide_context(b.1.clone()),
             ),
 
             _ => {
@@ -112,6 +119,7 @@ impl<'a> Object<'a> {
             Object::Map(_) => "map",
             Object::Return(_) => "return",
             Object::Builtin(..) => "builtin",
+            Object::Lambda(..) => "lambda",
             Object::Null => "null",
         }
         .to_string()
@@ -128,6 +136,15 @@ impl Display for Object<'_> {
 
             Object::Return(v) => write!(f, "return {}", (*v.clone()).0.to_string()),
             Object::Builtin(name, ..) => write!(f, "#pet.builtin({name})"),
+            Object::Lambda(args, typed, ..) => write!(
+                f,
+                "#pet.lambda({args}): {typed}",
+                args = args.join(", "),
+                typed = match typed {
+                    Some(t) => format!(" -> {}", t),
+                    None => "".to_string(),
+                }
+            ),
             Object::Null => write!(f, "null"),
 
             Object::Array(v) => write!(
@@ -185,8 +202,83 @@ impl ReplDisplay for Object<'_> {
                     .join(", ")
             ),
             Object::Return(v) => format!("{} {}", "return".red(), v.0.pretty_print()),
-            Object::Builtin(name, ..) => format!("{}({})", "#pet.builtin".purple().to_string(), name.magenta().to_string()),
+            Object::Builtin(name, ..) => format!(
+                "{}({})",
+                "#pet.builtin".purple().to_string(),
+                name.magenta().to_string()
+            ),
+            Object::Lambda(args, typed, ..) => format!(
+                "{}({}): {}",
+                "#pet.lambda".purple().to_string(),
+                format!("{}", args.join(", ")).magenta().to_string(),
+                match typed {
+                    Some(t) => format!("{}", t.magenta().to_string()),
+                    None => "".to_string(),
+                }
+            ),
             Object::Null => "null".magenta().to_string(),
+        }
+    }
+}
+
+impl<'a> ContextualObject<'a> {
+    pub fn call(
+        &self,
+        mut args: Vec<ContextualObject<'a>>,
+        scope: MutScope<'a>,
+        h: Hydrator,
+    ) -> Result<ContextualObject<'a>, Error> {
+        let call_scope = Scope::new_child(scope.clone(), "#pet.call");
+
+        match &self.0 {
+            Object::Lambda(fn_args, _, body) => {
+                if fn_args.len() != args.len() {
+                    return Err(partial!(
+                        "evaluating function call",
+                        format!("Expected {} arguments, got {}", fn_args.len(), args.len()),
+                        self.1.clone(),
+                        h.clone()
+                    ));
+                }
+
+                for (value, name) in args.into_iter().zip(fn_args.into_iter()) {
+                    call_scope
+                        .borrow_mut()
+                        .set(&name, value, self.1, h.clone())?;
+                }
+
+                let mut result: ContextualObject = Object::Null.anonymous();
+                for node in body {
+                    result = step(&node, call_scope.clone(), h.clone())?;
+                    if let Object::Return(expr) = &result.0 {
+                        result = *expr.clone();
+                        break;
+                    }
+                }
+
+                Ok(result)
+            }
+            Object::Builtin(_, needs_self, f) => {
+                if *needs_self {
+                    let slf = scope.borrow().get_self().ok_or(partial!(
+                        "evaluating function call",
+                        "No self provided for method call".to_string(),
+                        self.1.clone(),
+                        h.clone()
+                    ))?;
+
+                    args.insert(0, slf.clone());
+                }
+
+                let v = f(args, h.clone(), scope);
+                v
+            }
+            _ => Err(partial!(
+                "evaluating function call",
+                "Can't call a non-function".to_string(),
+                self.1.clone(),
+                h.clone()
+            )),
         }
     }
 }

@@ -12,5 +12,13 @@ pub fn extend<'a>(spans: &[Span<'a>]) -> Span<'a> {
     let start = positions.iter().map(|(s, _)| *s).min().unwrap();
     let end = positions.iter().map(|(_, e)| *e).max().unwrap();
 
-    Span::new(spans.first().unwrap().get_input(), start, end).unwrap()
+    Span::new(
+        spans
+            .first()
+            .unwrap_or(&Span::new("", 0, 0).unwrap())
+            .get_input(),
+        start,
+        end,
+    )
+    .unwrap_or(Span::new("", 0, 0).unwrap())
 }

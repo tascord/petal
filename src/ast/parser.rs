@@ -74,6 +74,68 @@ pub fn build_ast_from_expr<'a>(e: Pair<'a, Rule>, h: Hydrator) -> NodeRes<'a> {
             }
         }
 
+        Rule::var_assign => {
+            let (ident, expr) = takes!(e.clone(), 2);
+            Ok(Node::Assignment {
+                ident: ident!(ident, h.clone())?,
+                expr: Box::new(build_ast_from_expr(expr, h.clone())?),
+            }
+            .provide_context(e.as_span()))
+        }
+
+        Rule::conditional => {
+            let mut arms = Vec::new();
+            let mut els = None;
+
+            for arm in e.clone().into_inner() {
+                let body = arm
+                    .clone()
+                    .into_inner()
+                    .last()
+                    .unwrap()
+                    .into_inner()
+                    .map(|t| build_ast_from_expr(t, h.clone()))
+                    .try_collect()?;
+
+                match arm.as_rule() {
+                    Rule::if_arm | Rule::else_if_arm => {
+                        let condition = build!(arm.clone().into_inner().next().unwrap(), h.clone());
+                        arms.push((condition, body));
+                    }
+
+                    Rule::else_arm => {
+                        els = Some(body);
+                    }
+
+                    _ => unreachable!(),
+                }
+            }
+
+            Ok(Node::Conditional {
+                arms,
+                else_arm: els,
+            }
+            .provide_context(e.as_span()))
+        }
+
+        Rule::loop_while => {
+            let condition = build!(e.clone().into_inner().next().unwrap(), h.clone());
+            let body = e
+                .clone()
+                .into_inner()
+                .last()
+                .unwrap()
+                .into_inner()
+                .map(|t| build_ast_from_expr(t, h.clone()))
+                .try_collect()?;
+
+            Ok(Node::LoopWhile {
+                condition: Box::new(condition),
+                body,
+            }
+            .provide_context(e.as_span()))
+        }
+
         Rule::fn_decl => {
             let (outline, block) = takes!(e.clone(), 2);
             let body = block
@@ -124,13 +186,16 @@ pub fn build_ast_from_expr<'a>(e: Pair<'a, Rule>, h: Hydrator) -> NodeRes<'a> {
         }
 
         Rule::fn_call => {
-            let args = e.clone().into_inner().collect::<Vec<_>>();
+            let mut args = e.clone().into_inner().collect::<Vec<_>>();
             let ident = ident!(args.first().unwrap(), h.clone())?;
+            if !args.is_empty() {
+                args = args[1..].to_vec();
+            }
+
             Ok(Node::FunctionCall {
                 ident,
                 args: args
                     .into_iter()
-                    .skip(1)
                     .map(|t| build_ast_from_term(t.clone(), h.clone()))
                     .collect::<Result<Vec<_>, _>>()?,
             }
@@ -153,6 +218,53 @@ pub fn build_ast_from_expr<'a>(e: Pair<'a, Rule>, h: Hydrator) -> NodeRes<'a> {
                 Node::Return(Box::new(build_ast_from_expr(expr, h.clone())?))
                     .provide_context(e.as_span()),
             )
+        }
+
+        Rule::lambda => {
+            // TODO: Typed inputs
+
+            let return_type = match has!(e.clone(), "typed") {
+                true => Some(e.clone().into_inner().last().unwrap().as_str().to_string()),
+                false => None,
+            };
+
+            let args = e
+                .clone()
+                .into_inner()
+                .into_iter()
+                .take(
+                    e.clone().into_inner().into_iter().count()
+                        - match return_type.is_some() {
+                            true => 2,  // Block, and return type
+                            false => 1, // Block
+                        },
+                )
+                .map(|t| t.as_str().to_string())
+                .collect::<Vec<_>>();
+
+            let body = e
+                .clone()
+                .into_inner()
+                .last()
+                .unwrap()
+                .into_inner()
+                .map(|t| build_ast_from_expr(t, h.clone()))
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| {
+                    partial!(
+                        "building lambda body",
+                        e.to_string(),
+                        e.as_span(),
+                        h.clone()
+                    )
+                })?;
+
+            Ok(Node::Lambda {
+                args,
+                return_type,
+                body,
+            }
+            .provide_context(e.as_span()))
         }
 
         _ => {
@@ -188,8 +300,10 @@ fn build_ast_from_term<'a>(t: Pair<'a, Rule>, h: Hydrator) -> NodeRes<'a> {
             Ok(Node::Array(elements))
         }
         Rule::null => Ok(Node::Null),
-
-        _ => todo!(),
+        _ => {
+            eprintln!("{:?} not yet implemented", t.as_rule());
+            todo!()
+        }
     }
     .map(|n| n.provide_context(t.as_span()))
 }

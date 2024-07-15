@@ -1,0 +1,7 @@
+let secret = "Blaha";
+
+if secret == "Blah" {
+    term.print("Password accepted");
+} else {
+    term.print("Password denied.");
+}

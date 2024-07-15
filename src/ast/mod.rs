@@ -18,10 +18,27 @@ mod macros;
 pub mod op;
 mod parser;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ContextualNode<'a>(pub Node<'a>, pub Span<'a>);
+impl Eq for ContextualNode<'_> {}
+impl PartialOrd for ContextualNode<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self.0.partial_cmp(&other.0) {
+            Some(core::cmp::Ordering::Equal) => {
+                self.1.start_pos().partial_cmp(&other.1.start_pos())
+            }
+            ord => ord,
+        }
+    }
+}
 
-#[derive(Clone, Debug)]
+impl Ord for ContextualNode<'_> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum Node<'a> {
     // Literals
     Float(f64),
@@ -53,6 +70,21 @@ pub enum Node<'a> {
         expr: Box<ContextualNode<'a>>,
     },
 
+    Assignment {
+        ident: String,
+        expr: Box<ContextualNode<'a>>,
+    },
+
+    Conditional {
+        arms: Vec<(ContextualNode<'a>, Vec<ContextualNode<'a>>)>,
+        else_arm: Option<Vec<ContextualNode<'a>>>,
+    },
+
+    LoopWhile {
+        condition: Box<ContextualNode<'a>>,
+        body: Vec<ContextualNode<'a>>,
+    },
+
     FunctionDeclaration {
         ident: String,
         args: Vec<(String, String)>,
@@ -63,6 +95,12 @@ pub enum Node<'a> {
     FunctionCall {
         ident: String,
         args: Vec<ContextualNode<'a>>,
+    },
+
+    Lambda {
+        args: Vec<String>,
+        return_type: Option<String>,
+        body: Vec<ContextualNode<'a>>,
     },
 
     Struct {
@@ -137,5 +175,14 @@ impl<'a> Program<'a> {
     pub fn eval(self, scope: Option<MutScope<'a>>) -> miette::Result<ContextualObject<'a>> {
         let h = self.hydrator.clone();
         eval(self, scope.unwrap_or(Scope::new("#pet.repl")), h)
+    }
+}
+
+impl<'a> From<Vec<ContextualNode<'a>>> for Program<'a> {
+    fn from(tree: Vec<ContextualNode<'a>>) -> Self {
+        Program {
+            tree,
+            hydrator: ("#pet.eval".to_string(), Rc::new("".to_string())),
+        }
     }
 }
