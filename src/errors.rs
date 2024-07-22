@@ -1,9 +1,9 @@
-use std::{fmt::Display, rc::Rc};
+use std::{fmt::Display, sync::Arc};
 
 use miette::{Diagnostic, LabeledSpan, NamedSource, SourceOffset, SourceSpan};
 
 // Path, Content
-pub type Hydrator = (String, Rc<String>);
+pub type Hydrator = (String, Arc<String>);
 
 #[derive(Debug)]
 pub struct Error {

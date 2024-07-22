@@ -43,7 +43,7 @@ impl<'a> Hinter for PetalHinter<'a> {
             return None;
         }
 
-        let mut hints = self.0.clone().borrow().list_vars();
+        let mut hints = self.0.clone().read().unwrap().list_vars();
         hints.extend(
             vec!["let", "fn", "if", "else", "exit"]
                 .into_iter()

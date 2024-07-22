@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::BTreeMap, rc::Rc, sync::Arc};
+use std::{collections::BTreeMap, sync::{Arc, RwLock}};
 
 use pest::Span;
 
@@ -11,7 +11,7 @@ use crate::{
     object::{ContextualObject, Object},
 };
 
-pub type MutScope<'a> = Arc<RefCell<Scope<'a>>>;
+pub type MutScope<'a> = Arc<RwLock<Scope<'a>>>;
 
 #[derive(Debug, Clone)]
 pub struct Scope<'a> {
@@ -23,7 +23,7 @@ pub struct Scope<'a> {
 
 impl<'a> Scope<'a> {
     pub fn new(name: &str) -> MutScope<'a> {
-        Arc::new(RefCell::new(Scope {
+        Arc::new(RwLock::new(Scope {
             name: name.to_string(),
             store: BTreeMap::new(),
             parent: None,
@@ -32,7 +32,7 @@ impl<'a> Scope<'a> {
     }
 
     pub fn new_child(parent: MutScope<'a>, name: &str) -> MutScope<'a> {
-        Arc::new(RefCell::new(Scope {
+        Arc::new(RwLock::new(Scope {
             name: name.to_string(),
             store: BTreeMap::new(),
             parent: Some(parent),
@@ -47,7 +47,7 @@ impl<'a> Scope<'a> {
                 "object" => None,
                 _ => Some(a),
             }) {
-                Some(parent) => parent.borrow().get(ident),
+                Some(parent) => parent.read().unwrap().get(ident),
                 None => get_builtin(ident),
             },
         }
@@ -75,7 +75,7 @@ impl<'a> Scope<'a> {
                 Ok(())
             }
             None => match &self.parent {
-                Some(parent) => parent.borrow_mut().assign(ident, obj, s, h),
+                Some(parent) => parent.write().unwrap().assign(ident, obj, s, h),
                 None => Err(partial!(
                     "assigning variable",
                     format!("Variable {} does not exist", ident),
@@ -95,7 +95,7 @@ impl<'a> Scope<'a> {
         match &self.slf {
             Some(obj) => Some(obj.clone()),
             None => match &self.parent {
-                Some(parent) => parent.borrow().get_self(),
+                Some(parent) => parent.read().unwrap().get_self(),
                 None => None,
             },
         }
@@ -104,7 +104,7 @@ impl<'a> Scope<'a> {
     pub fn list_vars(&self) -> Vec<String> {
         let mut vars = self.store.keys().cloned().collect::<Vec<String>>();
         match &self.parent {
-            Some(parent) => vars.extend(parent.borrow().list_vars()),
+            Some(parent) => vars.extend(parent.read().unwrap().list_vars()),
             None => (),
         }
         vars
@@ -144,7 +144,7 @@ impl<'a> Scope<'a> {
             scope.force_set(intrinsic, get_intrinsic(intrinsic).unwrap());
         }
 
-        Ok(Arc::new(RefCell::new(scope.clone())))
+        Ok(Arc::new(RwLock::new(scope.clone())))
     }
 
     // This is just for nider debugging in the repl
@@ -155,7 +155,7 @@ impl<'a> Scope<'a> {
             m.insert(
                 string("parent"),
                 match self.parent.clone() {
-                    Some(p) => Object::String(p.borrow().name.clone()).anonymous(),
+                    Some(p) => Object::String(p.read().unwrap().name.clone()).anonymous(),
                     None => string("none"),
                 },
             );

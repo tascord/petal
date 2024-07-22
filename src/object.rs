@@ -21,6 +21,7 @@ pub enum Object<'a> {
     Array(Vec<ContextualObject<'a>>),
     Map(BTreeMap<ContextualObject<'a>, ContextualObject<'a>>),
     Return(Box<ContextualObject<'a>>),
+    Promise(String, String),
     // Function(Vec<Expr>, Block, Scope),
     Builtin(
         String,
@@ -120,6 +121,7 @@ impl<'a> Object<'a> {
             Object::Return(_) => "return",
             Object::Builtin(..) => "builtin",
             Object::Lambda(..) => "lambda",
+            Object::Promise(..) => "promise",
             Object::Null => "null",
         }
         .to_string()
@@ -146,6 +148,8 @@ impl Display for Object<'_> {
                 }
             ),
             Object::Null => write!(f, "null"),
+
+            Object::Promise(typed, ..) => write!(f, "#pet.promise({typed})"),
 
             Object::Array(v) => write!(
                 f,
@@ -216,6 +220,13 @@ impl ReplDisplay for Object<'_> {
                     None => "".to_string(),
                 }
             ),
+
+            Object::Promise(typed, ..) => format!(
+                "{}({})",
+                "#pet.promise".purple().to_string(),
+                typed.magenta().to_string()
+            ),
+
             Object::Null => "null".magenta().to_string(),
         }
     }
@@ -243,7 +254,8 @@ impl<'a> ContextualObject<'a> {
 
                 for (value, name) in args.into_iter().zip(fn_args.into_iter()) {
                     call_scope
-                        .borrow_mut()
+                        .write()
+                        .unwrap()
                         .set(&name, value, self.1, h.clone())?;
                 }
 
@@ -260,7 +272,7 @@ impl<'a> ContextualObject<'a> {
             }
             Object::Builtin(_, needs_self, f) => {
                 if *needs_self {
-                    let slf = scope.borrow().get_self().ok_or(partial!(
+                    let slf = scope.read().unwrap().get_self().ok_or(partial!(
                         "evaluating function call",
                         "No self provided for method call".to_string(),
                         self.1.clone(),

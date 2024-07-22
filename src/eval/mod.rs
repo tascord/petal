@@ -59,7 +59,8 @@ pub fn step<'a>(
         Node::Delclaration { ident, expr, .. } => {
             let value = step(&*expr, scope.clone(), h.clone())?;
             scope
-                .borrow_mut()
+                .write()
+                .unwrap()
                 .set(&ident, value.clone(), node.1, h.clone())?;
             Ok(value)
         }
@@ -67,7 +68,8 @@ pub fn step<'a>(
         Node::Assignment { ident, expr } => {
             let value = step(&*expr, scope.clone(), h.clone())?;
             scope
-                .borrow_mut()
+                .write()
+                .unwrap()
                 .assign(&ident, value.clone(), node.1, h.clone())?;
             Ok(value)
         }
@@ -79,7 +81,8 @@ pub fn step<'a>(
 
         // Identifiers
         Node::Ident(ident) => Ok(scope
-            .borrow()
+            .read()
+            .unwrap()
             .get(&ident)
             .ok_or(partial!(
                 "finding variable",
@@ -91,7 +94,7 @@ pub fn step<'a>(
 
         // Functions
         Node::FunctionCall { ident, args } => {
-            let v = scope.borrow().get(&ident).ok_or(partial!(
+            let v = scope.read().unwrap().get(&ident).ok_or(partial!(
                 "evaluating function call",
                 format!("Unknown function: {}", ident),
                 node.1.clone(),
@@ -126,16 +129,19 @@ pub fn step<'a>(
             for (index, item) in right.clone().into_iter().enumerate() {
                 let obj = match item.0 {
                     Node::Int(v) => container
-                        .borrow()
+                        .read()
+                        .unwrap()
                         .get(&v.to_string())
                         .unwrap_or(Object::Null.anonymous()),
                     Node::String(v) | Node::Ident(v) => container
-                        .borrow()
+                        .read()
+                        .unwrap()
                         .get(&v)
                         .unwrap_or(Object::Null.anonymous()),
                     Node::FunctionCall { ident, args } => {
                         let object = container
-                            .borrow()
+                            .read()
+                            .unwrap()
                             .get(&ident)
                             .ok_or(partial!(
                                 "evaluating index",
@@ -147,23 +153,25 @@ pub fn step<'a>(
 
                         match object {
                             Object::Builtin(_, slf, f) => {
-                                let prev = container.borrow().name.clone();
-                                container.clone().borrow_mut().name = "object_fncall".to_string();
+                                let prev = container.read().unwrap().name.clone();
+                                container.clone().write().unwrap().name =
+                                    "object_fncall".to_string();
 
                                 let mut args: Vec<ContextualObject<'a>> = args
                                     .into_iter()
                                     .map(|a| step(&a, container.clone(), h.clone()))
                                     .try_collect()?;
 
-                                container.clone().borrow_mut().name = prev;
+                                container.clone().write().unwrap().name = prev;
 
                                 if slf {
-                                    let slf = container.borrow().get_self().ok_or(partial!(
-                                        "evaluating function call",
-                                        "No self provided for method call".to_string(),
-                                        item.1.clone(),
-                                        h.clone()
-                                    ))?;
+                                    let slf =
+                                        container.read().unwrap().get_self().ok_or(partial!(
+                                            "evaluating function call",
+                                            "No self provided for method call".to_string(),
+                                            item.1.clone(),
+                                            h.clone()
+                                        ))?;
 
                                     args.insert(0, slf.clone());
                                 }

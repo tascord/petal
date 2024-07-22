@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use op::{Dyadic, Mondaic};
 
@@ -139,7 +139,7 @@ impl<'a> Program<'a> {
 
         let h: Hydrator = (
             path.unwrap_or_else(|| "#pet.eval".to_string()),
-            Rc::new(input.to_string()),
+            Arc::new(input.to_string()),
         );
 
         let pairs = PetParser::parse(Rule::program, refed).map_err(|e| {
@@ -178,11 +178,11 @@ impl<'a> Program<'a> {
     }
 }
 
-impl<'a> From<Vec<ContextualNode<'a>>> for Program<'a> {
-    fn from(tree: Vec<ContextualNode<'a>>) -> Self {
+impl<'a> From<(Vec<ContextualNode<'a>>, Hydrator)> for Program<'a> {
+    fn from(tree: (Vec<ContextualNode<'a>>, Hydrator)) -> Self {
         Program {
-            tree,
-            hydrator: ("#pet.eval".to_string(), Rc::new("".to_string())),
+            tree: tree.0,
+            hydrator: tree.1,
         }
     }
 }
